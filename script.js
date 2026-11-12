@@ -1,71 +1,308 @@
-// MUSIC SETUP: filenames below must match the files in your GitHub music repository.
-// If a song filename differs, edit only the matching "file" value here.
-const musicRepo = "https://raw.githubusercontent.com/SurojitMondal3108/Shilu-s-Birthday/main/";
-const tracks = [
-  {title:"Thik Jeno Love Story — Title Song", file:"Thik Jeno Love Story.mp3"},
-  {title:"You & Me", file:"you-me.mp3"},
-  {title:"Kothin", file:"Kothin.mp3"},
-  {title:"Love Me Thoda", file:"Love Me Thoda.mp3"},
-  {title:"Love Me Thoda — BGM", file:"Love Me Thoda - BGM.mp3"},
-  {title:"Tomake Na Lekha Chithita", file:"Tomake na lekha chithita ❤.mp3"},
-  {title:"Tor Naam — Male", file:"Tor Naam Male.mp3"},
-  {title:"O My Love", file:"o-my-love.mp3"},
-  {title:"Is This Love", file:"Is This Love.mp3"},
-  {title:"Thik Jeno Love Story — Only BGM", file:"Thik Jeno Love Story - Only BGM.mp3"}
+'use strict';
+
+/*
+ * SHILU BIRTHDAY STORY — MUSIC + PAGE CONTROLLER
+ * Music files are loaded from the exact filenames in the public GitHub repo.
+ * Browser policy requires one user gesture before audio can begin.
+ */
+
+const REPO_RAW = 'https://raw.githubusercontent.com/SurojitMondal3108/Shilu-s-Birthday/main/';
+
+const TRACKS = [
+  'Tum Se Hi - BGM.mp3',
+  'Tomake na lekha chithita ❤.mp3',
+  'Thik Jeno Love Story _ Only BGM.mp3',
+  'Tor Naam Male.mp3',
+  'Thik Jeno Love Story.mp3',
+  'Raabta.mp3',
+  'Kothin.mp3',
+  'Kaise Hua.mp3',
+  'o-my-love.mp3',
+  'Is This Love.mp3'
 ];
 
-const captions = ["A lovely moment","That smile","Simply you","A little sunshine","Beautifully you","A favourite frame","A day to remember","Little joys","A soft little memory","A lovely frame","Just being you","A moment worth keeping","Your kind of magic","A smile I remember","A little happiness","A beautiful day","A favourite look","A frame full of charm","The little things","A memory in colour","Just you","A bright moment","A gentle reminder","A lovely chapter","Always keep smiling"];
-const grid = document.getElementById("photoGrid");
-for(let i=1;i<=25;i++){
-  const figure=document.createElement("figure"); figure.className="photo";
-  figure.style.setProperty("--r",`${((i%5)-2)*0.7}deg`);
-  const img=document.createElement("img"); img.src=`images/shilu/photo-${String(i).padStart(2,"0")}.jpg`; img.alt=`Memory ${i} for Shilu`; img.loading="lazy";
-  const cap=document.createElement("figcaption"); cap.textContent=captions[i-1];
-  figure.append(img,cap); figure.addEventListener("click",()=>openLightbox(img.src)); grid.append(figure);
+const pages = Array.from(document.querySelectorAll('main > .page'));
+const audio = document.getElementById('player');
+const progress = document.getElementById('progress');
+const pageCounter = document.getElementById('pageCounter');
+const soundButton = document.getElementById('soundToggle');
+const musicPill = document.getElementById('musicPill');
+
+let currentTrack = -1;
+let musicUnlocked = false;
+let isMuted = false;
+let currentPageIndex = Math.max(0, pages.findIndex(page => page.classList.contains('active')));
+let fadeHandle = null;
+let pageTransitionLocked = false;
+
+if (!audio) {
+  console.error('Music player element #player was not found.');
+} else {
+  // Prepare the opening song immediately, but wait for a real user gesture
+  // before calling play() because browsers block audible autoplay.
+  audio.preload = 'auto';
+  audio.loop = true;
+  audio.volume = 0.62;
+  audio.setAttribute('playsinline', '');
 }
-const pages=[...document.querySelectorAll(".page")], audio=document.getElementById("player");
-let current=-1,started=false,soundEnabled=true,fadeTimer=null;
-const trackName=document.getElementById("trackName"),trackStatus=document.getElementById("trackStatus"),playBtn=document.getElementById("play"),disc=document.getElementById("disc");
-function trackUrl(i){return musicRepo+encodeURIComponent(tracks[i].file).replace(/%2F/g,"/");}
-function fadeTo(target,callback){
-  clearInterval(fadeTimer); const start=audio.volume; let step=0;
-  fadeTimer=setInterval(()=>{step++;audio.volume=Math.max(0,Math.min(1,start+(target-start)*step/12));if(step>=12){clearInterval(fadeTimer);if(callback)callback();}},45);
+
+function getTrackIndex(page) {
+  const value = Number.parseInt(page?.dataset.track ?? '0', 10);
+  return Number.isInteger(value) && value >= 0 && value < TRACKS.length ? value : 0;
 }
-function updatePlayer(playing){playBtn.textContent=playing?"Ⅱ":"▶";disc.classList.toggle("playing",playing);}
-function setTrack(i,autoplay=false){
-  if(i<0||i>=tracks.length)return;
-  current=i;trackName.textContent=tracks[i].title;
-  const load=()=>{audio.pause();audio.src=trackUrl(i);audio.volume=0; if(autoplay&&soundEnabled){audio.play().then(()=>{fadeTo(.62);trackStatus.textContent="Now playing";updatePlayer(true);}).catch(()=>{trackStatus.textContent="Music couldn't load — check the filename in the playlist";updatePlayer(false);});}else{trackStatus.textContent="Ready — press play";updatePlayer(false);}};
-  if(!audio.paused)fadeTo(0,load);else load();
+
+function getTrackUrl(trackName) {
+  // Encode spaces and Unicode characters in the exact GitHub asset filename.
+  return REPO_RAW + encodeURIComponent(trackName).replace(/%2F/gi, '/');
 }
-function show(id){
-  const page=document.getElementById(id);if(!page)return;
-  pages.forEach(p=>p.classList.remove("active"));page.classList.add("active");
-  const idx=pages.indexOf(page);document.getElementById("progress").style.width=`${((idx+1)/pages.length)*100}%`;
-  const song=Number(page.dataset.song);
-  if(started&&song!==current)setTrack(song,true);
-  window.scrollTo({top:0,behavior:"smooth"});
+
+// Preload Tum Se Hi on the first page so it is ready when the visitor interacts.
+if (audio) {
+  audio.src = getTrackUrl(TRACKS[0]);
+  audio.load();
 }
-document.getElementById("begin").addEventListener("click",()=>{started=true;setTrack(0,true);show("gallery");});
-document.querySelectorAll("[data-next]").forEach(btn=>btn.addEventListener("click",()=>show(btn.dataset.next)));
-document.getElementById("restart").addEventListener("click",()=>show("opening"));
-playBtn.addEventListener("click",async()=>{
-  if(current<0){started=true;setTrack(0,true);return;}
-  if(audio.paused){try{await audio.play();fadeTo(.62);trackStatus.textContent="Now playing";updatePlayer(true);}catch(e){trackStatus.textContent="Could not play this song — check its filename.";}}
-  else{fadeTo(0,()=>audio.pause());trackStatus.textContent="Paused";updatePlayer(false);}
+
+function setMusicIndicator(playing) {
+  if (musicPill) musicPill.classList.toggle('paused', !playing);
+  if (soundButton) {
+    soundButton.setAttribute('aria-label', isMuted ? 'Turn music on' : 'Mute music');
+    soundButton.innerHTML = isMuted ? '♫ <span>Sound off</span>' : '♫ <span>Sound on</span>';
+  }
+}
+
+function stopFade() {
+  if (fadeHandle !== null) {
+    window.clearInterval(fadeHandle);
+    fadeHandle = null;
+  }
+}
+
+function fadeVolume(target, duration = 180) {
+  if (!audio) return;
+  stopFade();
+  const start = audio.volume;
+  const steps = 9;
+  let step = 0;
+  fadeHandle = window.setInterval(() => {
+    step += 1;
+    audio.volume = start + (target - start) * (step / steps);
+    if (step >= steps) {
+      stopFade();
+      audio.volume = target;
+    }
+  }, duration / steps);
+}
+
+function playCurrentTrack({ forceRestart = false } = {}) {
+  if (!audio || isMuted) return;
+
+  const page = pages[currentPageIndex];
+  const nextTrack = getTrackIndex(page);
+
+  // Keep one uninterrupted track across consecutive pages assigned the same song.
+  if (!forceRestart && nextTrack === currentTrack && !audio.paused) {
+    return;
+  }
+
+  currentTrack = nextTrack;
+  const nextUrl = getTrackUrl(TRACKS[nextTrack]);
+
+  // Reset the source only when the page's assigned song actually changes.
+  if (audio.src !== nextUrl) {
+    audio.pause();
+    audio.src = nextUrl;
+    audio.load();
+  }
+
+  audio.loop = true;
+  audio.volume = 0.62;
+
+  const playPromise = audio.play();
+  if (playPromise && typeof playPromise.catch === 'function') {
+    playPromise
+      .then(() => setMusicIndicator(true))
+      .catch(error => {
+        setMusicIndicator(false);
+        console.warn('Could not play track:', TRACKS[nextTrack], error);
+      });
+  }
+}
+
+function unlockMusic() {
+  if (musicUnlocked || !audio || isMuted) return;
+  musicUnlocked = true;
+  // This call happens directly inside the first pointer/key interaction.
+  // That user gesture is required by Chrome, Safari, and mobile browsers.
+  playCurrentTrack({ forceRestart: false });
+}
+
+function updateProgress(index) {
+  const total = pages.length || 1;
+  const current = index + 1;
+  if (progress) {
+    progress.style.width = `${(current / total) * 100}%`;
+    progress.setAttribute('aria-valuenow', String(current));
+    progress.setAttribute('aria-valuemax', String(total));
+  }
+  if (pageCounter) {
+    pageCounter.textContent = `${String(current).padStart(2, '0')} / ${String(total).padStart(2, '0')}`;
+  }
+}
+
+function showPage(pageId, { userInitiated = true } = {}) {
+  const target = document.getElementById(pageId);
+  if (!target || !target.classList.contains('page')) return;
+
+  const nextIndex = pages.indexOf(target);
+  if (nextIndex < 0) return;
+
+  if (pageTransitionLocked || target === pages[currentPageIndex]) return;
+  pageTransitionLocked = true;
+  const outgoing = pages[currentPageIndex];
+  if (outgoing) outgoing.classList.add('page-leaving');
+  target.classList.add('active', 'page-entering');
+  currentPageIndex = nextIndex;
+  updateProgress(nextIndex);
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+
+  window.setTimeout(() => {
+    if (outgoing) outgoing.classList.remove('active', 'page-leaving');
+    target.classList.remove('page-entering');
+    pageTransitionLocked = false;
+  }, 820);
+
+  if (userInitiated) unlockMusic();
+
+  if (musicUnlocked && !isMuted) {
+    const newTrack = getTrackIndex(target);
+    if (newTrack !== currentTrack) playCurrentTrack();
+  }
+}
+
+// Start the opening background song on the visitor's first interaction.
+// Audible autoplay on page load is blocked by modern browsers, so this is the
+// earliest reliable browser-approved moment to begin playback.
+document.addEventListener('pointerdown', event => {
+  if (event.target.closest('#soundToggle')) return;
+  unlockMusic();
+}, { once: true, passive: true });
+document.addEventListener('keydown', unlockMusic, { once: true });
+
+// Reliable page navigation: event delegation also supports controls added later.
+// Add a working Previous button to every story page after the opening gallery.
+pages.forEach((page, index) => {
+  if (index === 0 || page.querySelector('[data-prev]')) return;
+  const nav = page.querySelector('.page-nav');
+  if (!nav) return;
+  const previous = document.createElement('button');
+  previous.type = 'button';
+  previous.className = 'outline-btn';
+  previous.dataset.prev = pages[index - 1].id;
+  previous.textContent = '← Previous page';
+  nav.prepend(previous);
 });
-document.getElementById("next").addEventListener("click",()=>{started=true;setTrack((current+1)%tracks.length,true);});
-document.getElementById("prev").addEventListener("click",()=>{started=true;setTrack((current-1+tracks.length)%tracks.length,true);});
-document.getElementById("soundToggle").addEventListener("click",()=>{
-  soundEnabled=!soundEnabled;document.getElementById("soundToggle").textContent=soundEnabled?"♫ Sound on":"♫ Sound off";
-  if(!soundEnabled){fadeTo(0,()=>audio.pause());trackStatus.textContent="Sound is off";updatePlayer(false);}
-  else if(started&&current>=0){audio.play().then(()=>{fadeTo(.62);updatePlayer(true);trackStatus.textContent="Now playing";}).catch(()=>{});}
+
+document.addEventListener('click', event => {
+  const button = event.target.closest('[data-next], [data-prev]');
+  if (!button) return;
+  event.preventDefault();
+  const destination = button.dataset.next || button.dataset.prev;
+  if (destination) showPage(destination, { userInitiated: true });
 });
-audio.addEventListener("ended",()=>{if(current<tracks.length-1)setTrack(current+1,true);else{trackStatus.textContent="Playlist finished";updatePlayer(false);}});
-document.getElementById("keep").addEventListener("click",e=>{e.currentTarget.textContent="Thank you for reading ♥";});
-function openLightbox(src){document.getElementById("lightboxImage").src=src;document.getElementById("lightbox").classList.add("open");}
-document.getElementById("closeLightbox").addEventListener("click",()=>document.getElementById("lightbox").classList.remove("open"));
-document.getElementById("lightbox").addEventListener("click",e=>{if(e.target.id==="lightbox")e.currentTarget.classList.remove("open");});
-document.addEventListener("keydown",e=>{if(e.key==="Escape")document.getElementById("lightbox").classList.remove("open");});
-function makePetal(){const el=document.createElement("span");el.className="petal";el.textContent=Math.random()>.5?"✿":"♥";el.style.left=`${Math.random()*100}vw`;el.style.fontSize=`${10+Math.random()*12}px`;el.style.opacity=.2+Math.random()*.35;el.style.animationDuration=`${8+Math.random()*7}s`;document.body.append(el);setTimeout(()=>el.remove(),16000);}
-setInterval(makePetal,1500);
+
+// Mute is allowed; there is deliberately no song-selection control.
+if (soundButton) {
+  soundButton.addEventListener('click', event => {
+    event.stopPropagation();
+    // The first click starts music; subsequent clicks toggle mute.
+    if (!musicUnlocked || isMuted) {
+      isMuted = false;
+      musicUnlocked = true;
+      playCurrentTrack({ forceRestart: false });
+      return;
+    }
+
+    isMuted = true;
+    stopFade();
+    audio?.pause();
+    setMusicIndicator(false);
+  });
+}
+
+// Keep an explicit opening-page play button as a reliable fallback. The first
+// tap starts Tum Se Hi; it does not restart an already-playing track.
+const openingMusicButton = document.getElementById('playOpeningMusic');
+if (openingMusicButton) {
+  openingMusicButton.addEventListener('click', event => {
+    event.stopPropagation();
+    isMuted = false;
+    musicUnlocked = true;
+    openingMusicButton.textContent = 'Starting Tum Se Hi…';
+    playCurrentTrack({ forceRestart: false });
+  });
+}
+
+if (audio) {
+  audio.addEventListener('play', () => setMusicIndicator(true));
+  audio.addEventListener('pause', () => setMusicIndicator(false));
+  audio.addEventListener('ended', () => {
+    // Native loop is enabled; this is a defensive fallback.
+    if (!isMuted && musicUnlocked) {
+      audio.currentTime = 0;
+      audio.play().catch(() => setMusicIndicator(false));
+    }
+  });
+  audio.addEventListener('error', () => {
+    setMusicIndicator(false);
+    const failed = TRACKS[currentTrack < 0 ? 0 : currentTrack] || 'unknown track';
+    if (openingMusicButton && currentPageIndex === 0) {
+      openingMusicButton.textContent = 'Retry Tum Se Hi ♫';
+    }
+    console.error('Audio failed to load. Check GitHub filename/path:', failed, audio.error);
+  });
+}
+
+// Header wordmark also returns to the opening page.
+document.querySelector('.wordmark')?.addEventListener('click', event => {
+  event.preventDefault();
+  showPage('page1', { userInitiated: true });
+});
+
+// Restart returns to the first remaining page without exposing song controls.
+const restartButton = document.getElementById('restart');
+if (restartButton) {
+  restartButton.addEventListener('click', () => {
+    showPage('page1', { userInitiated: true });
+  });
+}
+
+// Photo lightbox.
+document.querySelectorAll('[data-photo]').forEach(button => {
+  button.addEventListener('click', () => {
+    const number = String(button.dataset.photo).padStart(2, '0');
+    const image = document.getElementById('lightboxImage');
+    const lightbox = document.getElementById('lightbox');
+    if (image && lightbox) {
+      image.src = `images/shilu/photo-${number}.jpg`;
+      lightbox.classList.add('open');
+    }
+  });
+});
+
+function closeLightbox() {
+  document.getElementById('lightbox')?.classList.remove('open');
+}
+
+document.getElementById('closeLightbox')?.addEventListener('click', closeLightbox);
+document.getElementById('lightbox')?.addEventListener('click', event => {
+  if (event.target?.id === 'lightbox') closeLightbox();
+});
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape') closeLightbox();
+});
+
+// No story photos, flowers, or falling-petal decorations are added to the background.
+
+// Initialize the visible page state and counter.
+updateProgress(currentPageIndex);
+setMusicIndicator(false);
